@@ -9,23 +9,53 @@
 #include "input.h"
 #include "screen.h"
 
+// A component which automatically sends a draw message on frame start.
+struct AutoDrawComponent : public engine::Component<qp::AsteroidsMessage> {
+  AutoDrawComponent(engine::MessageBus<qp::AsteroidsMessage>* message_bus)
+      : engine::Component<qp::AsteroidsMessage>(message_bus) {}
+
+  virtual int x() = 0;
+  virtual int y() = 0;
+  virtual int z() = 0;
+  virtual SDL_Surface* surface() = 0;
+  virtual void OnMessageImpl(const qp::AsteroidsMessage& /* message */) {}
+
+  void Draw() {
+    qp::AsteroidsMessage m(qp::MessageType::DRAW_SURFACE);
+    m.x = x();
+    m.y = y();
+    m.z = z();
+    m.surface = surface();
+    message_bus()->SendMessage(m);
+  }
+
+  void OnMessage(const qp::AsteroidsMessage& message) final {
+    if (message.type == qp::MessageType::FRAME_START) {
+      Draw();
+    }
+    OnMessageImpl(message);
+  }
+};
+
 // A ship which responds to controls.
-struct Ship : public engine::Component<qp::AsteroidsMessage> {
+struct Ship : public AutoDrawComponent {
  public:
   Ship(engine::MessageBus<qp::AsteroidsMessage>* bus)
-      : engine::Component<qp::AsteroidsMessage>(bus),
+      : AutoDrawComponent(bus),
         x_(200),
         y_(450),
         move_amount_(2),
         surface_(SDL_LoadBMP("./ship.bmp")) {}
 
-  void OnMessage(const qp::AsteroidsMessage& message) override {
+  int x() override { return x_; }
+  int y() override { return y_; }
+  int z() override { return 1; }
+  SDL_Surface* surface() override { return surface_.get(); }
+
+  void OnMessageImpl(const qp::AsteroidsMessage& message) override {
     switch (message.type) {
       case qp::MessageType::KEY_PRESS:
         KeyPressed(message.sdl_key_code);
-        break;
-      case qp::MessageType::FRAME_START:
-        Draw();
         break;
       default:
         break;
@@ -36,15 +66,6 @@ struct Ship : public engine::Component<qp::AsteroidsMessage> {
   void Translate(int dx, int dy) {
     x_ += dx;
     y_ += dy;
-  }
-
-  void Draw() {
-    qp::AsteroidsMessage m(qp::MessageType::DRAW_SURFACE);
-    m.x = x_;
-    m.y = y_;
-    m.z = 1;
-    m.surface = surface_.get();
-    message_bus()->SendMessage(m);
   }
 
   void KeyPressed(int sdlk_keycode) {
@@ -74,16 +95,21 @@ struct Ship : public engine::Component<qp::AsteroidsMessage> {
 
 // A ship which automatically adjusts its position each frame according to a sin
 // wave.
-struct BadGuy : public engine::Component<qp::AsteroidsMessage> {
+struct BadGuy : public AutoDrawComponent {
  public:
   BadGuy(engine::MessageBus<qp::AsteroidsMessage>* bus)
-      : engine::Component<qp::AsteroidsMessage>(bus),
+      : AutoDrawComponent(bus),
         x_(0),
         y_(0),
         move_amount_(0.5),
         surface_(SDL_LoadBMP("./ship.bmp")) {}
 
-  void OnMessage(const qp::AsteroidsMessage& message) override {
+  int x() override { return x_; }
+  int y() override { return y_; }
+  int z() override { return 1; }
+  SDL_Surface* surface() override { return surface_.get(); }
+
+  void OnMessageImpl(const qp::AsteroidsMessage& message) override {
     if (message.type == qp::MessageType::FRAME_START) {
       x_ += coef_ * move_amount_;
       y_ = 20 * std::sin(x_ / 30) + offset_;
@@ -92,13 +118,6 @@ struct BadGuy : public engine::Component<qp::AsteroidsMessage> {
         coef_ *= -1;
         offset_ += 10;
       }
-
-      qp::AsteroidsMessage m(qp::MessageType::DRAW_SURFACE);
-      m.x = x_;
-      m.y = y_;
-      m.z = 1;
-      m.surface = surface_.get();
-      message_bus()->SendMessage(m);
     }
   }
 
