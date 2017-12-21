@@ -9,6 +9,7 @@
 #include "input.h"
 #include "screen.h"
 
+// A ship which responds to controls.
 struct Ship : public engine::Component<qp::AsteroidsMessage> {
  public:
   Ship(engine::MessageBus<qp::AsteroidsMessage>* bus)
@@ -71,6 +72,8 @@ struct Ship : public engine::Component<qp::AsteroidsMessage> {
   qp::SdlSurfacePtr surface_;
 };
 
+// A ship which automatically adjusts its position each frame according to a sin
+// wave.
 struct BadGuy : public engine::Component<qp::AsteroidsMessage> {
  public:
   BadGuy(engine::MessageBus<qp::AsteroidsMessage>* bus)
@@ -111,6 +114,7 @@ struct BadGuy : public engine::Component<qp::AsteroidsMessage> {
 int main() {
   engine::MessageBus<qp::AsteroidsMessage> message_bus;
 
+  // Create each of the components.
   auto screen = std::make_unique<qp::Screen>(
       &message_bus, "Asteroids", /* x */ 100,
       /* y */ 100, /* width */ 500, /* height */ 500);
@@ -123,11 +127,14 @@ int main() {
       qp::AsteroidsMessage(qp::MessageType::FRAME_START),
       qp::AsteroidsMessage(qp::MessageType::FRAME_END));
 
+  // Register them within the engine.
   engine.AddComponent(std::move(screen));
   engine.AddComponent(std::move(input));
   engine.AddComponent(std::move(ship));
   engine.AddComponent(std::move(bad_guy));
 
+  // Add one more subscriber which flips the run bit to false when a quit
+  // message is recieved.
   bool run = true;
   message_bus.AddSubscriber([&run](const qp::AsteroidsMessage& message) {
     if (message.type == qp::MessageType::GAME_END) {
@@ -135,5 +142,6 @@ int main() {
     }
   });
 
+  // Run the blocking loop.
   engine.BlockingGameLoop(&run);
 }

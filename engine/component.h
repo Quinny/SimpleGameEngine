@@ -7,8 +7,10 @@ namespace engine {
 
 // A game engine component. This is the main source of logic within the game.
 // Each component must override a message handling function which will be
-// automatically subscribed to via the base class. Components should be careful
-// not to create loops where they indefinitely respond to their own messages.
+// automatically subscribed to the message bus via the base class. Components
+// should be careful not to create loops where they indefinitely respond to
+// their own messages. See the class comment in message_bus.h for an example of
+// this.
 template <typename Message>
 class Component {
  public:

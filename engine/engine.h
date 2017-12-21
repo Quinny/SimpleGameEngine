@@ -24,6 +24,7 @@ class Engine {
     components_.push_back(std::move(component));
   }
 
+  // Runs a blocking game loop until the value of |run| is false.
   void BlockingGameLoop(bool* run) {
     message_bus_->SendMessage(start_message_);
     while (*run) {
@@ -38,7 +39,7 @@ class Engine {
   Message start_frame_message_;
   Message end_frame_message_;
 
-  // This technically does need to be here, but it makes it clear that the
+  // This technically does not need to be here, but it makes it clear that the
   // engine owns the components and prevents users of the API from modifying
   // them from outside the engine.
   std::vector<std::unique_ptr<Component<Message>>> components_;
