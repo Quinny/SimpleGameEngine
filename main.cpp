@@ -44,7 +44,7 @@ struct Ship : public AutoDrawComponent {
       : AutoDrawComponent(bus),
         x_(200),
         y_(450),
-        move_amount_(2),
+        move_amount_(5),
         surface_(SDL_LoadBMP("./ship.bmp")) {}
 
   int x() override { return x_; }
@@ -101,7 +101,7 @@ struct BadGuy : public AutoDrawComponent {
       : AutoDrawComponent(bus),
         x_(0),
         y_(0),
-        move_amount_(0.5),
+        move_amount_(2),
         surface_(SDL_LoadBMP("./ship.bmp")) {}
 
   int x() override { return x_; }
@@ -144,7 +144,8 @@ int main() {
   engine::Engine<qp::AsteroidsMessage> engine(
       &message_bus, qp::AsteroidsMessage(qp::MessageType::GAME_START),
       qp::AsteroidsMessage(qp::MessageType::FRAME_START),
-      qp::AsteroidsMessage(qp::MessageType::FRAME_END));
+      qp::AsteroidsMessage(qp::MessageType::FRAME_END),
+      /* fps */ 60);
 
   // Register them within the engine.
   engine.AddComponent(std::move(screen));
