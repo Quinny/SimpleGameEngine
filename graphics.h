@@ -1,12 +1,12 @@
-#ifndef SCREEN_H
-#define SCREEN_H
+#ifndef GRAPHICS_H
+#define GRAPHICS_H
 
 #include <algorithm>
 #include <iostream>
 
 #include "asteroids.h"
 #include "engine/component.h"
-#include "sdl-ptrs.h"
+#include "sdl/screen.h"
 
 namespace qp {
 
@@ -22,23 +22,16 @@ struct BlitRequest {
 // A component which processes Blit requests and draws them to an SDL window.
 // Note that DRAW_SURFACE messages will not be automatically drawn, but instead
 // buffered until the end of the frame and drawn in order of z value.
-class Screen : public engine::Component<qp::AsteroidsMessage> {
+class Graphics : public engine::Component<qp::AsteroidsMessage> {
  public:
-  Screen(engine::MessageBus<qp::AsteroidsMessage>* message_bus,
-         const std::string& title, const int x, const int y, const int w,
-         const int h)
-      : engine::Component<qp::AsteroidsMessage>(message_bus) {
-    SDL_Init(SDL_INIT_VIDEO);
-    window_.reset(
-        SDL_CreateWindow(title.c_str(), x, y, w, h, SDL_WINDOW_SHOWN));
-    window_surface_.reset(SDL_GetWindowSurface(window_.get()));
-  }
+  Graphics(engine::MessageBus<qp::AsteroidsMessage>* message_bus,
+           const std::string& title, const int x, const int y, const int w,
+           const int h)
+      : engine::Component<qp::AsteroidsMessage>(message_bus),
+        screen_(title, x, y, w, h) {}
 
   void OnMessage(const qp::AsteroidsMessage& message) override {
     switch (message.type) {
-      case qp::MessageType::GAME_START:
-        Update();
-        break;
       case qp::MessageType::FRAME_END:
         Update();
         break;
@@ -53,41 +46,21 @@ class Screen : public engine::Component<qp::AsteroidsMessage> {
 
   void Update() {
     if (!surfaces_to_draw_.empty()) {
-      Clear();
+      screen_.Clear();
       std::sort(surfaces_to_draw_.begin(), surfaces_to_draw_.end());
       for (const auto& blit_request : surfaces_to_draw_) {
-        Blit(blit_request.surface, blit_request.x, blit_request.y);
+        screen_.Blit(blit_request.surface, blit_request.x, blit_request.y);
       }
-      SDL_UpdateWindowSurface(window_.get());
+      screen_.Update();
       surfaces_to_draw_.clear();
     }
   }
 
-  void Blit(SDL_Surface* surface, const int x, const int y) {
-    SDL_Rect dst_rect;
-    dst_rect.x = x;
-    dst_rect.y = y;
-    SDL_BlitSurface(surface, /* src_rect */ NULL, window_surface_.get(),
-                    &dst_rect);
-  }
-
-  void Clear() {
-    SDL_FillRect(window_surface_.get(), /* destination_rect */ NULL,
-                 /* color */ 0);
-  }
-
-  ~Screen() {
-    window_surface_.reset();
-    window_.reset();
-    SDL_Quit();
-  }
-
  private:
-  qp::SdlSurfacePtr window_surface_;
-  qp::SdlWindowPtr window_;
+  qp::Screen screen_;
   std::vector<BlitRequest> surfaces_to_draw_;
 };
 
 }  // namespace qp
 
-#endif /* SCREEN_H */
+#endif /* GRAPHICS_H */

@@ -6,8 +6,8 @@
 #include "asteroids.h"
 #include "engine/component.h"
 #include "engine/engine.h"
+#include "graphics.h"
 #include "input.h"
-#include "screen.h"
 
 // A component which automatically sends a draw message on frame start.
 struct AutoDrawComponent : public engine::Component<qp::AsteroidsMessage> {
@@ -134,7 +134,7 @@ int main() {
   engine::MessageBus<qp::AsteroidsMessage> message_bus;
 
   // Create each of the components.
-  auto screen = std::make_unique<qp::Screen>(
+  auto graphics = std::make_unique<qp::Graphics>(
       &message_bus, "Asteroids", /* x */ 100,
       /* y */ 100, /* width */ 500, /* height */ 500);
   auto input = std::make_unique<qp::InputComponent>(&message_bus);
@@ -148,7 +148,7 @@ int main() {
       /* fps */ 60);
 
   // Register them within the engine.
-  engine.AddComponent(std::move(screen));
+  engine.AddComponent(std::move(graphics));
   engine.AddComponent(std::move(input));
   engine.AddComponent(std::move(ship));
   engine.AddComponent(std::move(bad_guy));
