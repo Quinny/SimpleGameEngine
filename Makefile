@@ -1,5 +1,8 @@
 default:
-	g++ main.cpp -lsdl2
+	g++ main.cpp -lsdl2 -O3 -o bin/game
+
+debug:
+	g++ main.cpp -lsdl2 -g3 -o bin/game
 
 run: default
-	./a.out
+	./bin/game

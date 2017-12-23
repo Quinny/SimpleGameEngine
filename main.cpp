@@ -10,57 +10,51 @@
 #include "input.h"
 
 // A component which automatically sends a draw message on frame start.
-struct AutoDrawComponent : public engine::Component<qp::AsteroidsMessage> {
-  AutoDrawComponent(engine::MessageBus<qp::AsteroidsMessage>* message_bus)
-      : engine::Component<qp::AsteroidsMessage>(message_bus) {}
+class AutoDrawComponent
+    : public engine::Component<qp::MessageType, qp::AsteroidsMessage> {
+ public:
+  AutoDrawComponent(
+      engine::MessageBus<qp::MessageType, qp::AsteroidsMessage>* message_bus)
+      : engine::Component<qp::MessageType, qp::AsteroidsMessage>(message_bus) {
+    OnMessage(qp::MessageType::FRAME_END,
+              std::bind(&AutoDrawComponent::Draw, this));
+  }
 
   virtual int x() = 0;
   virtual int y() = 0;
   virtual int z() = 0;
   virtual SDL_Surface* surface() = 0;
-  virtual void OnMessageImpl(const qp::AsteroidsMessage& /* message */) {}
 
+ private:
   void Draw() {
-    qp::AsteroidsMessage m(qp::MessageType::DRAW_SURFACE);
+    qp::AsteroidsMessage m;
     m.x = x();
     m.y = y();
     m.z = z();
     m.surface = surface();
-    message_bus()->SendMessage(m);
-  }
-
-  void OnMessage(const qp::AsteroidsMessage& message) final {
-    if (message.type == qp::MessageType::FRAME_START) {
-      Draw();
-    }
-    OnMessageImpl(message);
+    SendMessage(qp::MessageType::DRAW_SURFACE, m);
   }
 };
 
 // A ship which responds to controls.
 struct Ship : public AutoDrawComponent {
  public:
-  Ship(engine::MessageBus<qp::AsteroidsMessage>* bus)
+  Ship(engine::MessageBus<qp::MessageType, qp::AsteroidsMessage>* bus)
       : AutoDrawComponent(bus),
         x_(200),
         y_(450),
         move_amount_(5),
-        surface_(SDL_LoadBMP("./ship.bmp")) {}
+        surface_(SDL_LoadBMP("./ship.bmp")) {
+    OnMessage(qp::MessageType::KEY_PRESS,
+              [this](const qp::AsteroidsMessage& message) {
+                KeyPressed(message.sdl_key_code);
+              });
+  }
 
   int x() override { return x_; }
   int y() override { return y_; }
   int z() override { return 1; }
   SDL_Surface* surface() override { return surface_.get(); }
-
-  void OnMessageImpl(const qp::AsteroidsMessage& message) override {
-    switch (message.type) {
-      case qp::MessageType::KEY_PRESS:
-        KeyPressed(message.sdl_key_code);
-        break;
-      default:
-        break;
-    }
-  }
 
  private:
   void Translate(int dx, int dy) {
@@ -97,31 +91,33 @@ struct Ship : public AutoDrawComponent {
 // wave.
 struct BadGuy : public AutoDrawComponent {
  public:
-  BadGuy(engine::MessageBus<qp::AsteroidsMessage>* bus)
+  BadGuy(engine::MessageBus<qp::MessageType, qp::AsteroidsMessage>* bus)
       : AutoDrawComponent(bus),
         x_(0),
         y_(0),
         move_amount_(2),
-        surface_(SDL_LoadBMP("./ship.bmp")) {}
+        surface_(SDL_LoadBMP("./ship.bmp")) {
+    OnMessage(qp::MessageType::FRAME_START,
+              std::bind(&BadGuy::UpdatePosition, this));
+  }
 
   int x() override { return x_; }
   int y() override { return y_; }
   int z() override { return 1; }
   SDL_Surface* surface() override { return surface_.get(); }
 
-  void OnMessageImpl(const qp::AsteroidsMessage& message) override {
-    if (message.type == qp::MessageType::FRAME_START) {
-      x_ += coef_ * move_amount_;
-      y_ = 20 * std::sin(x_ / 30) + offset_;
+ private:
+  void UpdatePosition() {
+    x_ += coef_ * move_amount_;
+    y_ = 20 * std::sin(x_ / 30) + offset_;
 
-      if (x_ < 0 || x_ > 400) {
-        coef_ *= -1;
-        offset_ += 10;
-      }
+    if (x_ < 0 || x_ > 400) {
+      coef_ *= -1;
+      offset_ += 20;
+      move_amount_ += 0.5;
     }
   }
 
- private:
   double x_;
   int y_;
   double move_amount_;
@@ -131,7 +127,7 @@ struct BadGuy : public AutoDrawComponent {
 };
 
 int main() {
-  engine::MessageBus<qp::AsteroidsMessage> message_bus;
+  engine::MessageBus<qp::MessageType, qp::AsteroidsMessage> message_bus;
 
   // Create each of the components.
   auto graphics = std::make_unique<qp::Graphics>(
@@ -141,10 +137,9 @@ int main() {
   auto ship = std::make_unique<Ship>(&message_bus);
   auto bad_guy = std::make_unique<BadGuy>(&message_bus);
 
-  engine::Engine<qp::AsteroidsMessage> engine(
-      &message_bus, qp::AsteroidsMessage(qp::MessageType::GAME_START),
-      qp::AsteroidsMessage(qp::MessageType::FRAME_START),
-      qp::AsteroidsMessage(qp::MessageType::FRAME_END),
+  engine::Engine<qp::MessageType, qp::AsteroidsMessage> engine(
+      &message_bus, {qp::MessageType::GAME_START, {}},
+      {qp::MessageType::FRAME_START, {}}, {qp::MessageType::FRAME_END, {}},
       /* fps */ 60);
 
   // Register them within the engine.
@@ -156,11 +151,8 @@ int main() {
   // Add one more subscriber which flips the run bit to false when a quit
   // message is recieved.
   bool run = true;
-  message_bus.AddSubscriber([&run](const qp::AsteroidsMessage& message) {
-    if (message.type == qp::MessageType::GAME_END) {
-      run = false;
-    }
-  });
+  message_bus.AddIgnoringSubscriber(qp::MessageType::GAME_END,
+                                    [&run]() { run = false; });
 
   // Run the blocking loop.
   engine.BlockingGameLoop(&run);

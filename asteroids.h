@@ -19,10 +19,6 @@ enum class MessageType {
 };
 
 struct AsteroidsMessage {
-  AsteroidsMessage(const MessageType t) : type(t) {}
-
-  // Message type will always be set.
-  const MessageType type;
   // Coordinates of the message. Will be set for:
   // - DRAW_SURFACE
   int x, y, z;

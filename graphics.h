@@ -6,6 +6,7 @@
 
 #include "asteroids.h"
 #include "engine/component.h"
+#include "engine/message_bus.h"
 #include "sdl/screen.h"
 
 namespace qp {
@@ -22,26 +23,25 @@ struct BlitRequest {
 // A component which processes Blit requests and draws them to an SDL window.
 // Note that DRAW_SURFACE messages will not be automatically drawn, but instead
 // buffered until the end of the frame and drawn in order of z value.
-class Graphics : public engine::Component<qp::AsteroidsMessage> {
+class Graphics
+    : public engine::Component<qp::MessageType, qp::AsteroidsMessage> {
  public:
-  Graphics(engine::MessageBus<qp::AsteroidsMessage>* message_bus,
-           const std::string& title, const int x, const int y, const int w,
-           const int h)
-      : engine::Component<qp::AsteroidsMessage>(message_bus),
-        screen_(title, x, y, w, h) {}
+  Graphics(
+      engine::MessageBus<qp::MessageType, qp::AsteroidsMessage>* message_bus,
+      const std::string& title, const int x, const int y, const int w,
+      const int h)
+      : engine::Component<qp::MessageType, qp::AsteroidsMessage>(message_bus),
+        screen_(title, x, y, w, h) {
+    using std::placeholders::_1;
+    OnMessage(qp::MessageType::DRAW_SURFACE,
+              std::bind(&Graphics::BufferSurface, this, _1));
+    OnMessage(qp::MessageType::FRAME_END, std::bind(&Graphics::Update, this));
+  }
 
-  void OnMessage(const qp::AsteroidsMessage& message) override {
-    switch (message.type) {
-      case qp::MessageType::FRAME_END:
-        Update();
-        break;
-      case qp::MessageType::DRAW_SURFACE:
-        surfaces_to_draw_.push_back(
-            {message.surface, message.x, message.y, message.z});
-        break;
-      default:
-        break;
-    }
+ private:
+  void BufferSurface(const qp::AsteroidsMessage& message) {
+    surfaces_to_draw_.push_back(
+        {message.surface, message.x, message.y, message.z});
   }
 
   void Update() {
